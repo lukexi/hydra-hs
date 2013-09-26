@@ -1,23 +1,33 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
+-- | A wrapper for the Sixense SDK, based on the C SDK.
 module System.Hardware.Hydra
-       ( SixenseSuccess(..)
-       , sixenseInit
+       (
+         -- * Initialization
+         sixenseInit
        , sixenseExit
+         -- * General information
        -- , maxControllers
        , getMaxControllers
        , maxBases
        -- , setActiveBase
-       -- , baseConnected
+       , baseConnected
+       , controllerEnabled
+       , numActiveControllers  
+       , historySize
+         -- * Types
+       , SixenseSuccess(..)
        , ControllerID
        , Button
        , buttonBumper, buttonJoystick
        , button1, button2, button3, button4
        , buttonStart
-       , controllerEnabled
-       -- , numActiveControllers  
-       -- , historySize
        , ControllerData(..)
+         -- * Obtaining data
+       , getData
+       , getAllData
+       , getNewestData
+       , getAllNewestData
        )
   where
 
@@ -250,8 +260,9 @@ getNewestData which = alloca $ \dataPtr -> do
 foreign import ccall "sixense.h sixenseGetNewestData"
   c_sixenseGetAllNewestData :: Ptr ControllerData -> IO CInt
                            
-sixenseGetAllNewestData :: IO (Maybe [ControllerData])
-sixenseGetAllNewestData = allocaArray maxControllers $ \dataPtr -> do
+-- | Get the most recent state of all of the controllers.
+getAllNewestData :: IO (Maybe [ControllerData])
+getAllNewestData = allocaArray maxControllers $ \dataPtr -> do
     success <- mFromCInt (c_sixenseGetAllNewestData dataPtr)
     case success of 
       Success -> peekArray maxControllers dataPtr >>= return . Just 
