@@ -10,7 +10,7 @@ module System.Hardware.Hydra
        -- , maxControllers
        , getMaxControllers
        , maxBases
-       -- , setActiveBase
+       , setActiveBase
        , baseConnected
        , controllerEnabled
        , numActiveControllers  
@@ -28,6 +28,8 @@ module System.Hardware.Hydra
        , getAllData
        , getNewestData
        , getAllNewestData
+         -- * Miscellaneous
+       , setBaseColor
        )
   where
 
@@ -64,7 +66,7 @@ combineButtons = Button . foldr ((.|.) . unButton) 0
 maxControllers :: Int
 maxControllers = (fromIntegral :: CInt -> Int) #const SIXENSE_MAX_CONTROLLERS
 
-data SixenseSuccess = Success | Failure
+data SixenseSuccess = Success | Failure deriving (Show, Eq)
 
 fromCInt :: CInt -> SixenseSuccess
 fromCInt i = if i == -1 then Failure else Success
@@ -287,7 +289,14 @@ SIXENSE_EXPORT int sixenseGetFilterEnabled( int *on_or_off );
 
 SIXENSE_EXPORT int sixenseSetFilterParams( float near_range, float near_val, float far_range, float far_val );
 SIXENSE_EXPORT int sixenseGetFilterParams( float *near_range, float *near_val, float *far_range, float *far_val );
-
-SIXENSE_EXPORT int sixenseSetBaseColor( unsigned char red, unsigned char green, unsigned char blue );
-SIXENSE_EXPORT int sixenseGetBaseColor( unsigned char *red, unsigned char *green, unsigned char *blue );
 -}
+
+foreign import ccall "sixense.h sixenseSetBaseColor"
+  c_sixenseSetBaseColor :: CUChar -> CUChar -> CUChar -> IO CInt
+                          
+setBaseColor :: Int -> Int -> Int -> IO SixenseSuccess
+setBaseColor r g b = mFromCInt $ c_sixenseSetBaseColor (fromIntegral r) (fromIntegral g) (fromIntegral b)
+
+
+-- SIXENSE_EXPORT int sixenseGetBaseColor( unsigned char *red, unsigned char *green, unsigned char *blue );
+-- -}
