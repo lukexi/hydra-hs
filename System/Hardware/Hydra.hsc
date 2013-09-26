@@ -206,26 +206,77 @@ foreign import ccall "sixense.h sixenseGetHistorySize"
 historySize :: IO Int
 historySize = (liftM fromIntegral) c_sixenseGetHistorySize
 
--- TODO
+
+foreign import ccall "sixense.h sixenseGetData"
+  c_sixenseGetData :: CInt -> CInt -> Ptr ControllerData -> IO CInt
 
 -- historyLength :: 0-9
 -- | Get state of one of the controllers, selecting how far back into a history of the last 10 updates. 
-getData :: ControllerID 
-          -> Int -- length of the history to obtain. 0-9
-          -> IO (Maybe [ControllerData])
-getData which historyLength = undefined
-
+getData :: ControllerID -- ^ The ID of the desired controller. Valid values are from 0 to 3. If the desired controller is not connected, an empty data packet is returned. Empty data packets are initialized to a zero position and the identity rotation matrix.
+          -> Int -- ^ length of the history to obtain. 0-9
+          -> IO (Maybe ControllerData)
+getData which historyLength = alloca $ \dataPtr -> do
+    success <- mFromCInt (c_sixenseGetData (fromIntegral which) (fromIntegral historyLength) dataPtr)
+    case success of 
+      Success -> peek dataPtr >>= return . Just 
+      Failure -> return Nothing
+      
+      
+foreign import ccall "sixense.h sixenseGetAllData"
+  c_sixenseGetAllData :: CInt -> Ptr ControllerData -> IO CInt
+                     
 -- | Get state of all of the controllers, selecting how far back into a history of the last 10 updates. 
-getAllData :: Int -> IO (Maybe [ControllerData])
-getAllData historyLength = undefined
+getAllData :: Int -- ^ length of the history to obtain. 0-9
+           -> IO (Maybe [ControllerData])
+getAllData historyLength = allocaArray maxControllers $ \dataPtr -> do
+    success <- mFromCInt (c_sixenseGetAllData (fromIntegral historyLength) dataPtr)
+    case success of 
+      Success -> peekArray maxControllers dataPtr >>= return . Just 
+      Failure -> return Nothing
+
+      
+foreign import ccall "sixense.h sixenseGetNewestData"
+  c_sixenseGetNewestData :: CInt -> Ptr ControllerData -> IO CInt
 
 -- | Get the most recent state of one of the controllers.
 getNewestData :: ControllerID -> IO (Maybe ControllerData)
-getNewestData which = undefined
+getNewestData which = alloca $ \dataPtr -> do
+    success <- mFromCInt (c_sixenseGetNewestData (fromIntegral which) dataPtr)
+    case success of 
+      Success -> peek dataPtr >>= return . Just 
+      Failure -> return Nothing
 
-getAllNewestData :: IO (Maybe [ControllerData])
-getAllNewestData = undefined
+
+foreign import ccall "sixense.h sixenseGetNewestData"
+  c_sixenseGetAllNewestData :: Ptr ControllerData -> IO CInt
+                           
+sixenseGetAllNewestData :: IO (Maybe [ControllerData])
+sixenseGetAllNewestData = allocaArray maxControllers $ \dataPtr -> do
+    success <- mFromCInt (c_sixenseGetAllNewestData dataPtr)
+    case success of 
+      Success -> peekArray maxControllers dataPtr >>= return . Just 
+      Failure -> return Nothing
 
 
 -- TODO: Only implement the functions you actually need so as to not sit on this forever.
 
+{-
+SIXENSE_EXPORT int sixenseSetHemisphereTrackingMode( int which_controller, int state );
+SIXENSE_EXPORT int sixenseGetHemisphereTrackingMode( int which_controller, int *state );
+
+SIXENSE_EXPORT int sixenseAutoEnableHemisphereTracking( int which_controller );
+
+SIXENSE_EXPORT int sixenseSetHighPriorityBindingEnabled( int on_or_off );
+SIXENSE_EXPORT int sixenseGetHighPriorityBindingEnabled( int *on_or_off );
+
+SIXENSE_EXPORT int sixenseTriggerVibration( int controller_id, int duration_100ms, int pattern_id );
+
+SIXENSE_EXPORT int sixenseSetFilterEnabled( int on_or_off );
+SIXENSE_EXPORT int sixenseGetFilterEnabled( int *on_or_off );
+
+SIXENSE_EXPORT int sixenseSetFilterParams( float near_range, float near_val, float far_range, float far_val );
+SIXENSE_EXPORT int sixenseGetFilterParams( float *near_range, float *near_val, float *far_range, float *far_val );
+
+SIXENSE_EXPORT int sixenseSetBaseColor( unsigned char red, unsigned char green, unsigned char blue );
+SIXENSE_EXPORT int sixenseGetBaseColor( unsigned char *red, unsigned char *green, unsigned char *blue );
+-}
