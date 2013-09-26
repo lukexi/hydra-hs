@@ -6,6 +6,7 @@ module System.Hardware.Hydra
          -- * Initialization
          sixenseInit
        , sixenseExit
+       , autoEnableHemisphereTracking
          -- * General information
        -- , maxControllers
        , getMaxControllers
@@ -43,6 +44,7 @@ import qualified Data.Packed.Matrix as Matrix
 import Data.Packed.Matrix(Matrix,(><))
 import Control.Monad
 import Control.Applicative
+import Control.Concurrent(threadDelay)
 
 #include <sixense.h>
 
@@ -160,7 +162,12 @@ foreign import ccall "sixense.h sixenseInit"
 -- | Initialize the Sixense library.
 -- This function initializes the Sixense library. It must be called at least one time per application. Subsequent calls will have no effect. Once initialized, the other Sixense function calls will work as described until sixenseExit() is called.
 sixenseInit :: IO SixenseSuccess
-sixenseInit = mFromCInt c_sixsenseInit
+sixenseInit = do 
+  r <- mFromCInt c_sixsenseInit
+  -- delay for 2 seconds. 
+  -- It takes some unknown amount of time before things are actually ready
+  threadDelay 2000000
+  return r
 
 foreign import ccall "sixense.h sixenseExit"
   c_sixsenseExit :: IO CInt
@@ -169,6 +176,21 @@ foreign import ccall "sixense.h sixenseExit"
 -- This shuts down the Sixense library. After this function call, all Sixense API calls will return failure, until sixenseInit() is called again.
 sixenseExit :: IO SixenseSuccess
 sixenseExit = mFromCInt c_sixsenseExit
+
+
+foreign import ccall "sixense.h sixenseAutoEnableHemisphereTracking"
+  c_sixenseAutoEnableHemisphereTracking :: CInt -> IO CInt
+                   
+-- | Shut down the Sixense library.
+-- This shuts down the Sixense library. After this function call, all Sixense API calls will return failure, until sixenseInit() is called again.
+autoEnableHemisphereTracking :: ControllerID -> IO SixenseSuccess
+autoEnableHemisphereTracking controller = mFromCInt $ c_sixenseAutoEnableHemisphereTracking (fromIntegral controller)
+{-
+SIXENSE_EXPORT int sixenseSetHemisphereTrackingMode( int which_controller, int state );
+SIXENSE_EXPORT int sixenseGetHemisphereTrackingMode( int which_controller, int *state );
+
+SIXENSE_EXPORT int sixenseAutoEnableHemisphereTracking( int which_controller );
+-}
 
 
 
@@ -274,10 +296,6 @@ getAllNewestData = allocaArray maxControllers $ \dataPtr -> do
 -- TODO: Only implement the functions you actually need so as to not sit on this forever.
 
 {-
-SIXENSE_EXPORT int sixenseSetHemisphereTrackingMode( int which_controller, int state );
-SIXENSE_EXPORT int sixenseGetHemisphereTrackingMode( int which_controller, int *state );
-
-SIXENSE_EXPORT int sixenseAutoEnableHemisphereTracking( int which_controller );
 
 SIXENSE_EXPORT int sixenseSetHighPriorityBindingEnabled( int on_or_off );
 SIXENSE_EXPORT int sixenseGetHighPriorityBindingEnabled( int *on_or_off );

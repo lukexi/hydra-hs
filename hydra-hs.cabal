@@ -33,6 +33,8 @@ library
   
   -- Modules included in this library but not exported.
   -- other-modules:       
+
+  hs-source-dirs:      src
   
   build-depends:       base ==4.6.*
                      , hmatrix >= 0.15
