@@ -10,7 +10,6 @@ main = do
   setBaseSuccess <- setActiveBase 0
   autoEnableHemisphereTracking 0
   setActiveBase 0
-  colorSuccess <- setBaseColor 255 100 0
   putStrLn ("Set active base to 0: " ++ show setBaseSuccess)
   mapM_ (\i -> controllerEnabled i >>= \e -> putStrLn ("Controller " ++ (show i) ++ " enabled: " ++ (show e))) [0..3]
   active <- numActiveControllers

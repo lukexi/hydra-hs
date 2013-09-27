@@ -30,7 +30,6 @@ module System.Hardware.Hydra
        , getNewestData
        , getAllNewestData
          -- * Miscellaneous
-       , setBaseColor
        )
   where
 
@@ -295,6 +294,8 @@ getAllNewestData = allocaArray maxControllers $ \dataPtr -> do
 
 -- TODO: Only implement the functions you actually need so as to not sit on this forever.
 
+
+------ Functions restricted to dev kits:
 {-
 
 SIXENSE_EXPORT int sixenseSetHighPriorityBindingEnabled( int on_or_off );
@@ -312,9 +313,23 @@ SIXENSE_EXPORT int sixenseGetFilterParams( float *near_range, float *near_val, f
 foreign import ccall "sixense.h sixenseSetBaseColor"
   c_sixenseSetBaseColor :: CUChar -> CUChar -> CUChar -> IO CInt
                           
+-- | Sets the color of the LED on the Sixense wireless devkits. The Razer Hydra colors cannot be changed.
 setBaseColor :: Int -> Int -> Int -> IO SixenseSuccess
 setBaseColor r g b = mFromCInt $ c_sixenseSetBaseColor (fromIntegral r) (fromIntegral g) (fromIntegral b)
 
 
--- SIXENSE_EXPORT int sixenseGetBaseColor( unsigned char *red, unsigned char *green, unsigned char *blue );
--- -}
+foreign import ccall "sixense.h sixenseGetBaseColor"
+  c_sixenseGetBaseColor :: Ptr CUChar -> Ptr CUChar -> Ptr CUChar -> IO CInt
+                          
+
+-- | Gets the color of the LED on the Sixense wireless devkits. The Razer Hydra colors cannot be changed.
+getBaseColor :: IO (Maybe (Int, Int, Int))
+getBaseColor = allocaArray 3 $ \colorsPtrs -> do
+  let (rPtr,gPtr,bPtr) = (colorsPtrs, advancePtr colorsPtrs 1, advancePtr colorsPtrs 2)
+  success <- mFromCInt $ c_sixenseGetBaseColor rPtr gPtr bPtr
+  case success of
+    Failure -> return Nothing
+    Success -> do
+      colors <- peekArray 3 colorsPtrs
+      let [r,g,b] = map fromIntegral colors
+      return $ Just (r,g,b)
