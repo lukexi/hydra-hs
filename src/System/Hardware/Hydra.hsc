@@ -30,6 +30,8 @@ module System.Hardware.Hydra
        , getNewestData
        , getAllNewestData
          -- * Miscellaneous
+       , setFilterEnabled
+       , getFilterEnabled
        )
   where
 
@@ -292,7 +294,54 @@ getAllNewestData = allocaArray maxControllers $ \dataPtr -> do
       Failure -> return Nothing
 
 
--- TODO: Only implement the functions you actually need so as to not sit on this forever.
+foreign import ccall "sixense.h sixenseSetFilterEnabled"
+  c_sixenseSetFilterEnabled :: CInt -> IO CInt
+                           
+-- | Turn the internal position and orientation filtering on or off.
+setFilterEnabled :: Bool -> IO SixenseSuccess
+setFilterEnabled onOrOff = mFromCInt $ c_sixenseSetFilterEnabled ((fromIntegral . fromEnum) onOrOff)
+
+foreign import ccall "sixense.h sixenseGetFilterEnabled"
+  c_sixenseGetFilterEnabled :: Ptr CInt -> IO CInt
+                           
+-- | Returns the enable status of the internal position and orientation filtering.
+getFilterEnabled :: IO Bool
+getFilterEnabled = alloca $ \ptr -> do
+  success <- mFromCInt $ c_sixenseGetFilterEnabled ptr
+  case success of 
+    Success -> peek ptr >>= return . (/= 0)
+    Failure -> return False
+    
+foreign import ccall "sixense.h sixenseSetFilterParams"
+  c_sixenseSetFilterParams :: CFloat -> CFloat -> CFloat -> CFloat -> IO CInt
+                           
+-- | Set the parameters that control the position and orientation filtering level.
+setFilterParams :: Float -- ^ nearRange: The range from the Base Unit at which to start increasing the filtering level from the nearVal to farVal. Between nearRange and farRange, the nearVal and farVal are linearly interpolated.
+                -> Float -- ^ nearVal: The minimum filtering value. This value is used for when the controller is between 0 and nearVal millimeters from the Sixense Base Unit. Valid values are between 0 and 1.
+                -> Float -- ^ farRange: The range from the Sixense Base Unit after which to stop interpolating the filter value from the nearVal, and after which to simply use farVal.
+                -> Float -- ^ farVal: The maximum filtering value. This value is used for when the controller is between farVal and infinity. Valid values are between 0 and 1.
+                -> IO SixenseSuccess
+setFilterParams nearRange nearVal farRange farVal = 
+  mFromCInt $ c_sixenseSetFilterParams 
+  (realToFrac nearRange) (realToFrac nearVal)
+  (realToFrac farRange) (realToFrac farVal)
+  
+foreign import ccall "sixense.h sixenseGetFilterParams"
+  c_sixenseGetFilterParams :: Ptr CFloat -> Ptr CFloat -> Ptr CFloat -> Ptr CFloat -> IO CInt
+                           
+-- | Returns the current filtering parameter values.
+getFilterParams :: IO (Maybe (Float, Float, Float, Float))
+getFilterParams = allocaArray 4 $ \valPtrs -> do
+  let nRangePtr = valPtrs
+      nValPtr   = advancePtr valPtrs 1
+      fRangePtr = advancePtr valPtrs 2
+      fValPtr   = advancePtr valPtrs 3
+  success <- mFromCInt $ c_sixenseGetFilterParams nRangePtr nValPtr fRangePtr fValPtr
+  case success of 
+    Success -> peekArray 4 valPtrs >>= \vals -> case map realToFrac vals of
+      [nR,nV,fR,fV] -> return $ Just (nR,nV,fR,fV)
+    Failure -> return Nothing
+  
 
 
 ------ Functions restricted to dev kits:
@@ -302,12 +351,6 @@ SIXENSE_EXPORT int sixenseSetHighPriorityBindingEnabled( int on_or_off );
 SIXENSE_EXPORT int sixenseGetHighPriorityBindingEnabled( int *on_or_off );
 
 SIXENSE_EXPORT int sixenseTriggerVibration( int controller_id, int duration_100ms, int pattern_id );
-
-SIXENSE_EXPORT int sixenseSetFilterEnabled( int on_or_off );
-SIXENSE_EXPORT int sixenseGetFilterEnabled( int *on_or_off );
-
-SIXENSE_EXPORT int sixenseSetFilterParams( float near_range, float near_val, float far_range, float far_val );
-SIXENSE_EXPORT int sixenseGetFilterParams( float *near_range, float *near_val, float *far_range, float *far_val );
 -}
 
 foreign import ccall "sixense.h sixenseSetBaseColor"
