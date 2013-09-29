@@ -24,6 +24,7 @@ module System.Hardware.Hydra
        , button1, button2, button3, button4
        , buttonStart
        , ControllerData(..)
+       , AllControllerData(..)
          -- * Obtaining data
        , getData
        , getAllData
@@ -101,12 +102,12 @@ instance Storable ControllerData where
   sizeOf _ = #{size sixenseControllerData}
   alignment _ = alignment (undefined :: CInt) -- alignment should be alignment of largest data type in the C struct (we could also use CFloat here instead)
   peek p = ControllerData 
-           <$> (do
-                   ptr <- (#{peek sixenseControllerData, pos} p) :: IO (Ptr CFloat)
+           <$> (do          
+                   let ptr = (#{ptr sixenseControllerData, pos} p) :: Ptr CFloat
                    lst <- peekArray 3 ptr
                    return $ Vector.fromList $ map realToFrac lst)
            <*> (do
-                   ptr <- (#{peek sixenseControllerData, rot_mat} p) :: IO (Ptr CFloat)
+                   let ptr = (#{ptr sixenseControllerData, rot_mat} p) :: Ptr CFloat
                    lst <- peekArray (3 * 3) ptr
                    return $ (3><3) $ map realToFrac lst)
            <*> liftM realToFrac ((#{peek sixenseControllerData, joystick_x } p) :: IO CFloat)
@@ -115,7 +116,7 @@ instance Storable ControllerData where
            <*> liftM Button (#{peek sixenseControllerData, buttons } p)
            <*> liftM fromIntegral ((#{peek sixenseControllerData, sequence_number } p) :: IO CUChar)
            <*> (do
-                   ptr <- (#{peek sixenseControllerData, rot_quat} p) :: IO (Ptr CFloat)
+                   let ptr = (#{ptr sixenseControllerData, rot_quat} p) :: Ptr CFloat
                    lst <- peekArray 4 ptr
                    return $ Vector.fromList $ map realToFrac lst)
            <*> (#{peek sixenseControllerData, firmware_revision } p)
@@ -124,7 +125,7 @@ instance Storable ControllerData where
            <*> (#{peek sixenseControllerData, magnetic_frequency } p)
            <*> liftM (/= 0) ((#{peek sixenseControllerData, enabled } p) :: IO CInt)
            <*> (#{peek sixenseControllerData, controller_index } p)
-           <*> liftM (/= 0) ((#{peek sixenseControllerData, is_docked } p) :: IO CUChar) -- ??
+           <*> liftM (/= 0) ((#{peek sixenseControllerData, is_docked } p) :: IO CUChar)
            <*> liftM fromIntegral ((#{peek sixenseControllerData, which_hand } p) :: IO CUChar)
            <*> liftM (/= 0) ((#{peek sixenseControllerData, hemi_tracking_enabled } p) :: IO CUChar)
   poke p x = do
@@ -154,6 +155,16 @@ instance Storable ControllerData where
     
                              
 data AllControllerData = AllControllerData { controllers :: [ControllerData] }
+
+instance Storable AllControllerData where
+  sizeOf _ = #{size sixenseAllControllerData}
+  alignment _ = alignment (undefined :: ControllerData)
+  peek p = AllControllerData <$> (do
+                                     let ptr = (#{ptr sixenseAllControllerData, controllers} p) :: Ptr ControllerData
+                                     lst <- peekArray maxControllers ptr
+                                     return lst)
+  poke p x = do
+    (pokeArray (#{ptr sixenseAllControllerData, controllers} p) (controllers x))
                                 
 type ControllerID = Int
 
@@ -258,15 +269,15 @@ getData which historyLength = alloca $ \dataPtr -> do
       
       
 foreign import ccall "sixense.h sixenseGetAllData"
-  c_sixenseGetAllData :: CInt -> Ptr ControllerData -> IO CInt
+  c_sixenseGetAllData :: CInt -> Ptr AllControllerData -> IO CInt
                      
 -- | Get state of all of the controllers, selecting how far back into a history of the last 10 updates. 
 getAllData :: Int -- ^ length of the history to obtain. 0-9
-           -> IO (Maybe [ControllerData])
-getAllData historyLength = allocaArray maxControllers $ \dataPtr -> do
+           -> IO (Maybe AllControllerData)
+getAllData historyLength = alloca $ \dataPtr -> do
     success <- mFromCInt (c_sixenseGetAllData (fromIntegral historyLength) dataPtr)
     case success of 
-      Success -> peekArray maxControllers dataPtr >>= return . Just 
+      Success -> peek dataPtr >>= return . Just 
       Failure -> return Nothing
 
       
@@ -283,14 +294,14 @@ getNewestData which = alloca $ \dataPtr -> do
 
 
 foreign import ccall "sixense.h sixenseGetNewestData"
-  c_sixenseGetAllNewestData :: Ptr ControllerData -> IO CInt
+  c_sixenseGetAllNewestData :: Ptr AllControllerData -> IO CInt
                            
 -- | Get the most recent state of all of the controllers.
-getAllNewestData :: IO (Maybe [ControllerData])
-getAllNewestData = allocaArray maxControllers $ \dataPtr -> do
+getAllNewestData :: IO (Maybe AllControllerData)
+getAllNewestData = alloca $ \dataPtr -> do
     success <- mFromCInt (c_sixenseGetAllNewestData dataPtr)
     case success of 
-      Success -> peekArray maxControllers dataPtr >>= return . Just 
+      Success -> peek dataPtr >>= return . Just 
       Failure -> return Nothing
 
 
