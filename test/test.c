@@ -1,8 +1,10 @@
 #include <sixense.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
-// compile: gcc test.c -lsixense_x64
+// compile: gcc test.c -I/usr/local/include -L/usr/local/lib -lsixense_x64
+//       or gcc test.c -arch i386 -I/usr/local/include -L/usr/local/lib -lsixense
 int main() {
     printf("Hello, world!\n");
     sixenseInit();

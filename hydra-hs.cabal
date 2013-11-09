@@ -1,6 +1,6 @@
 name:                hydra-hs
 
-version:             1.0.0.1
+version:             1.0.0.2
 
 synopsis:            Haskell binding to the Sixense SDK for the Razer Hydra
 
@@ -39,11 +39,18 @@ library
   build-depends:       base ==4.6.*
                      , hmatrix >= 0.15
   
-  if flag(UsePkgConfig)
-    PkgConfig-Depends: libsixense
+  if !arch(x86_64)
+    if flag(UsePkgConfig)
+      PkgConfig-Depends: libsixense
+    else
+      Includes: sixense.h
+      Extra-libraries: sixense
   else
-    Includes: sixense.h
-    Extra-libraries: sixense
+    if flag(UsePkgConfig)
+      PkgConfig-Depends: libsixense_x64
+    else
+      Includes: sixense.h
+      Extra-libraries: sixense_x64
   -- note: the install script that comes with the Sixense SDK is slightly buggy.
   -- I had to manually copy libsixense.dylib to /usr/local/lib
 
