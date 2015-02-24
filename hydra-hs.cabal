@@ -7,7 +7,7 @@ synopsis:            Haskell binding to the Sixense SDK for the Razer Hydra
 description:         Bindings to the Sixense SDK for the Razer Hydra.
                      To get started, get the SDK from Sixense (http://sixense.com/developers), install it, then install hydra.hs.
 
-                     The install script that comes with the SDK might not always work. 
+                     The install script that comes with the SDK might not always work.
 		     To build hydra-hs, you need both sixense.h and libsixense.dylib in a location where they can be found (such as /usr/local/include and /usr/local/lib).
 
 homepage:            https://github.com/mruegenberg/hydra-hs
@@ -35,10 +35,10 @@ library
   exposed-modules:      System.Hardware.Hydra
 
   hs-source-dirs:      src
-  
-  build-depends:       base ==4.6.*
-                     , hmatrix >= 0.15
-  
+
+  build-depends:       base >=4.6
+                     , linear
+
   if !arch(x86_64)
     if flag(UsePkgConfig)
       PkgConfig-Depends: libsixense
