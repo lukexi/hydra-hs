@@ -16,10 +16,14 @@ module System.Hardware.Hydra
        , controllerEnabled
        , numActiveControllers
        , historySize
+       , isButtonDown
+       , activeButtons
          -- * Types
        , SixenseSuccess(..)
        , ControllerID
-       , Button
+       , ButtonBits
+       , Button(..)
+       , WhichHand(..)
        , buttonBumper, buttonJoystick
        , button1, button2, button3, button4
        , buttonStart
@@ -42,16 +46,17 @@ import Foreign.C.Error
 import Foreign.Storable
 import Linear
 import Control.Monad
+import Data.Maybe
 import Control.Applicative
 import Control.Concurrent(threadDelay)
 import Data.Foldable (toList)
 import Data.Traversable
 #include <sixense.h>
 
-newtype Button = Button { unButton :: CUInt }
+newtype ButtonBits = ButtonBits { unButtonBits :: CUInt }
                deriving (Eq,Show)
 
-#{enum Button, Button
+#{enum ButtonBits, ButtonBits
  , buttonBumper = SIXENSE_BUTTON_BUMPER
  , buttonJoystick = SIXENSE_BUTTON_JOYSTICK
  , button1 = SIXENSE_BUTTON_1
@@ -61,8 +66,33 @@ newtype Button = Button { unButton :: CUInt }
  , buttonStart = SIXENSE_BUTTON_START
  }
 
-combineButtons :: [Button] -> Button
-combineButtons = Button . foldr ((.|.) . unButton) 0
+data Button = ButtonBumper
+            | ButtonJoystick
+            | Button1
+            | Button2
+            | Button3
+            | Button4
+            | ButtonStart deriving (Eq, Show)
+
+data WhichHand = NoHand | LeftHand | RightHand deriving (Eq, Show, Ord, Enum)
+
+activeButtons :: ButtonBits -> [Button]
+activeButtons buttonBits = catMaybes
+    [ check buttonBumper    ButtonBumper
+    , check buttonJoystick  ButtonJoystick
+    , check button1         Button1
+    , check button2         Button2
+    , check button3         Button3
+    , check button4         Button4
+    , check buttonStart     ButtonStart
+    ]
+    where check buttonBit button = if isButtonDown buttonBit buttonBits then Just button else Nothing
+
+combineButtons :: [ButtonBits] -> ButtonBits
+combineButtons = ButtonBits . foldr ((.|.) . unButtonBits) 0
+
+isButtonDown :: ButtonBits -> ButtonBits -> Bool
+isButtonDown (ButtonBits a) (ButtonBits b) = a .&. b > 0
 
 -- | Returns the maximum number of controllers supported by the Sixense control system.
 maxControllers :: Int
@@ -83,7 +113,7 @@ data ControllerData = ControllerData
                       , joystickX :: !Float
                       , joystickY :: !Float
                       , trigger :: !Float
-                      , buttons :: !Button
+                      , buttons :: !ButtonBits
                       , sequenceNumber :: !Word8
                       , rotQuat :: V4 Float
                       , firmwareRevision :: !CUShort
@@ -93,7 +123,7 @@ data ControllerData = ControllerData
                       , enabled :: !Bool
                       , controllerIndex :: !CInt
                       , isDocked :: !Bool
-                      , whichHand :: !Word8
+                      , whichHand :: !WhichHand
                       , hemiTrackingEnabled :: !Bool
                       } deriving Show
 
@@ -113,7 +143,7 @@ instance Storable ControllerData where
            <*> liftM realToFrac ((#{peek sixenseControllerData, joystick_x } p) :: IO CFloat)
            <*> liftM realToFrac ((#{peek sixenseControllerData, joystick_y } p) :: IO CFloat)
            <*> liftM realToFrac ((#{peek sixenseControllerData, trigger } p) :: IO CFloat)
-           <*> liftM Button (#{peek sixenseControllerData, buttons } p)
+           <*> liftM ButtonBits (#{peek sixenseControllerData, buttons } p)
            <*> liftM fromIntegral ((#{peek sixenseControllerData, sequence_number } p) :: IO CUChar)
            <*> (do
                    let ptr = (#{ptr sixenseControllerData, rot_quat} p) :: Ptr (V4 CFloat)
@@ -126,7 +156,7 @@ instance Storable ControllerData where
            <*> liftM (/= 0) ((#{peek sixenseControllerData, enabled } p) :: IO CInt)
            <*> (#{peek sixenseControllerData, controller_index } p)
            <*> liftM (/= 0) ((#{peek sixenseControllerData, is_docked } p) :: IO CUChar)
-           <*> liftM fromIntegral ((#{peek sixenseControllerData, which_hand } p) :: IO CUChar)
+           <*> liftM (toEnum . fromIntegral) ((#{peek sixenseControllerData, which_hand } p) :: IO CUChar)
            <*> liftM (/= 0) ((#{peek sixenseControllerData, hemi_tracking_enabled } p) :: IO CUChar)
   poke p x = do
     (poke
@@ -138,7 +168,7 @@ instance Storable ControllerData where
     #{poke sixenseControllerData, joystick_x} p (joystickX x)
     #{poke sixenseControllerData, joystick_y} p (joystickY x)
     #{poke sixenseControllerData, trigger} p (trigger x)
-    #{poke sixenseControllerData, buttons} p (unButton $ buttons x)
+    #{poke sixenseControllerData, buttons} p (unButtonBits $ buttons x)
     #{poke sixenseControllerData, sequence_number} p (sequenceNumber x)
     (poke
      (#{ptr sixenseControllerData, rot_quat} p)
@@ -150,7 +180,7 @@ instance Storable ControllerData where
     #{poke sixenseControllerData, enabled} p (((fromIntegral . fromEnum) :: Bool -> CInt) $ enabled x)
     #{poke sixenseControllerData, controller_index} p (controllerIndex x)
     #{poke sixenseControllerData, is_docked} p (((fromIntegral . fromEnum) :: Bool -> CInt) $ isDocked x)
-    #{poke sixenseControllerData, which_hand} p (whichHand x)
+    #{poke sixenseControllerData, which_hand} p (((fromIntegral . fromEnum) :: WhichHand -> CUChar) $ whichHand x)
     #{poke sixenseControllerData, hemi_tracking_enabled} p (((fromIntegral . fromEnum) :: Bool -> CInt) $ hemiTrackingEnabled x)
 
 
@@ -178,6 +208,7 @@ sixenseInit = do
   r <- mFromCInt c_sixsenseInit
   -- delay for 2 seconds.
   -- It takes some unknown amount of time before things are actually ready
+  -- otherwise, we get a segmentation fault at random
   threadDelay 2000000
   return r
 
