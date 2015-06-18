@@ -21,45 +21,44 @@ import System.Hardware.Hydra.Raw (ControllerData(..), Button(..), ButtonBits, Wh
 import Control.Monad.Trans
 import Data.Maybe
 import Control.Monad
-import Linear
 import Data.IORef
-import Control.Concurrent
 
 data SixenseBase = SixenseBase
-  { sixbCorrection :: IORef (M44 Float)
+  { sixbConnected :: IORef Bool
   }
 
--- initSixense :: MonadIO m => m SixenseBase
-initSixense :: MonadIO m => m ()
+initSixense :: MonadIO m => m SixenseBase
 initSixense = liftIO $ do
-  putStrLn "HELLO!"
   _ <- Raw.sixenseInit
-  -- threadDelay 2000000
 
-  putStrLn "THERE"
-  -- correctionRef <- newIORef identity
-  connected <- Raw.baseConnected 0
-  when connected $ do
-    putStrLn "SAILOR"
+  base <- SixenseBase 
+    <$> newIORef False
+
+  _ <- checkConnected base
+
+  return base
+
+-- | If the base becomes newly connected,
+-- set it as the active base and recalibrate the controllers.
+-- It's important to check baseConnected before setActiveBase,
+-- as setActiveBase will crash otherwise :()
+checkConnected :: SixenseBase -> IO Bool
+checkConnected base = do
+  nowConnected <- Raw.baseConnected 0
+  wasConnected <- readIORef (sixbConnected base)
+  when (nowConnected && not wasConnected) $ do
     _ <- Raw.setActiveBase 0
-    _ <- Raw.autoEnableHemisphereTracking 0
-    return ()
+    recalibrate
+  writeIORef (sixbConnected base) nowConnected
+  return nowConnected
 
-  -- return SixenseBase
-  --   { sixbCorrection = correctionRef
-  --   }
 
--- getHands :: MonadIO m => SixenseBase -> m [ControllerData]
-getHands :: MonadIO m => m [ControllerData]
--- getHands base = liftIO $ do
-getHands = liftIO $ do  
-  connected <- Raw.baseConnected 0
+getHands :: MonadIO m => SixenseBase -> m [ControllerData]
+getHands base = liftIO $ do
+  
+  connected <- checkConnected base
   if connected 
     then do
-      _ <- Raw.setActiveBase 0
-      _ <- Raw.autoEnableHemisphereTracking 0
-      _ <- Raw.autoEnableHemisphereTracking 1
-
       leftHand   <- Raw.getNewestData 0
       rightHand  <- Raw.getNewestData 1
       return (catMaybes [leftHand, rightHand])
@@ -68,10 +67,9 @@ getHands = liftIO $ do
 
 -- Via http://sixense.com/forum/vbulletin/showthread.php?3078-Hydra-calibration-code,
 -- apparently recalibration just calls autoEnableHemisphereTracking for each controller.
--- recalibrate :: MonadIO m => SixenseBase -> m ()
--- recalibrate base = liftIO $ do
 recalibrate :: MonadIO m => m ()
 recalibrate = liftIO $ do
+  putStrLn "Recalibrating Hydra"
   _ <- Raw.autoEnableHemisphereTracking 0
   _ <- Raw.autoEnableHemisphereTracking 1
   return ()
