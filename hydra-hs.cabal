@@ -1,29 +1,32 @@
 name:                hydra-hs
-version:             1.0.0.2
+version:             1.1.0
 synopsis:            Haskell binding to the Sixense SDK for the Razer Hydra
 description:         Bindings to the Sixense SDK for the Razer Hydra.
-                     To get started, get the SDK from Sixense (http://sixense.com/developers), install it, then install hydra.hs.
-
-                     The install script that comes with the SDK might not always work.
-		     To build hydra-hs, you need both sixense.h and libsixense.dylib in a location where they can be found (such as /usr/local/include and /usr/local/lib).
-homepage:            https://github.com/mruegenberg/hydra-hs
+                     Use ./copyToMac.sh or ./copyToMSYS2.sh (for MSYS2 on Windows),
+                     and then cabal install should work.
+                     Use the System.Hardware.Hydra rather than the Raw module as the Raw module can crash easily.
+homepage:            https://github.com/lukexi/hydra-hs
 license:             BSD3
 license-file:        LICENSE
-author:              Marcel Ruegenberg
-maintainer:          github@dustlab.com
+author:              Marcel Ruegenberg & Luke Iannini
+maintainer:          github@dustlab.com or lukexi@me.com
 category:            Hardware
 build-type:          Simple
 cabal-version:       >=1.8
 
 
 library
-  exposed-modules:     System.Hardware.Hydra
+  exposed-modules:     
+    System.Hardware.Hydra
+    System.Hardware.Hydra.Raw
   hs-source-dirs:      src
   build-depends:       base >=4.6
                      , linear
+                     , mtl
   include-dirs:        include
   extra-libraries:     sixense_x64
   includes:            sixense.h
+  ghc-options:         -Wall
   if os(windows)
     extra-lib-dirs: c:\msys64\usr\local\bin
 

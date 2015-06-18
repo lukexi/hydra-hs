@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
 -- | A wrapper for the Sixense SDK, based on the C SDK.
-module System.Hardware.Hydra
+module System.Hardware.Hydra.Raw
        (
          -- * Initialization
          sixenseInit
@@ -17,7 +17,6 @@ module System.Hardware.Hydra
        , numActiveControllers
        , historySize
        , isButtonDown
-       , activeButtons
          -- * Types
        , SixenseSuccess(..)
        , ControllerID
@@ -37,20 +36,17 @@ module System.Hardware.Hydra
          -- * Miscellaneous
        , setFilterEnabled
        , getFilterEnabled
+       , setFilterParams
+       , setBaseColor
+       , combineButtons
        )
   where
 
 import Foreign
 import Foreign.C.Types
-import Foreign.C.Error
-import Foreign.Storable
 import Linear
 import Control.Monad
-import Data.Maybe
-import Control.Applicative
-import Control.Concurrent(threadDelay)
-import Data.Foldable (toList)
-import Data.Traversable
+
 #include <sixense.h>
 
 newtype ButtonBits = ButtonBits { unButtonBits :: CUInt }
@@ -74,19 +70,10 @@ data Button = ButtonBumper
             | Button4
             | ButtonStart deriving (Eq, Show)
 
-data WhichHand = NoHand | LeftHand | RightHand deriving (Eq, Show, Ord, Enum)
-
-activeButtons :: ButtonBits -> [Button]
-activeButtons buttonBits = catMaybes
-    [ check buttonBumper    ButtonBumper
-    , check buttonJoystick  ButtonJoystick
-    , check button1         Button1
-    , check button2         Button2
-    , check button3         Button3
-    , check button4         Button4
-    , check buttonStart     ButtonStart
-    ]
-    where check buttonBit button = if isButtonDown buttonBit buttonBits then Just button else Nothing
+data WhichHand = NoHand 
+               | LeftHand 
+               | RightHand 
+               deriving (Eq, Show, Ord, Enum)
 
 combineButtons :: [ButtonBits] -> ButtonBits
 combineButtons = ButtonBits . foldr ((.|.) . unButtonBits) 0
@@ -106,6 +93,11 @@ fromCInt i = if i == -1 then Failure else Success
 mFromCInt :: IO CInt -> IO SixenseSuccess
 mFromCInt = liftM fromCInt
 
+quatFromV4 :: V4 a -> Quaternion a
+quatFromV4 (V4 x y z w) = Quaternion w (V3 x y z)
+
+v4FromQuat :: Quaternion a -> V4 a
+v4FromQuat (Quaternion w (V3 x y z)) = V4 x y z w
 
 data ControllerData = ControllerData
                       { pos :: V3 Float
@@ -115,7 +107,7 @@ data ControllerData = ControllerData
                       , trigger :: !Float
                       , buttons :: !ButtonBits
                       , sequenceNumber :: !Word8
-                      , rotQuat :: V4 Float
+                      , rotQuat :: Quaternion Float
                       , firmwareRevision :: !CUShort
                       , hardwareRevision :: !CUShort
                       , packetType :: !CUShort
@@ -148,7 +140,7 @@ instance Storable ControllerData where
            <*> (do
                    let ptr = (#{ptr sixenseControllerData, rot_quat} p) :: Ptr (V4 CFloat)
                    lst <- peek ptr
-                   return $ fmap realToFrac lst)
+                   return $ fmap realToFrac (quatFromV4 lst))
            <*> (#{peek sixenseControllerData, firmware_revision } p)
            <*> (#{peek sixenseControllerData, hardware_revision } p)
            <*> (#{peek sixenseControllerData, packet_type } p)
@@ -172,7 +164,7 @@ instance Storable ControllerData where
     #{poke sixenseControllerData, sequence_number} p (sequenceNumber x)
     (poke
      (#{ptr sixenseControllerData, rot_quat} p)
-     (rotQuat x))
+     (v4FromQuat (rotQuat x)))
     #{poke sixenseControllerData, firmware_revision} p (firmwareRevision x)
     #{poke sixenseControllerData, hardware_revision} p (hardwareRevision x)
     #{poke sixenseControllerData, packet_type} p (packetType x)
@@ -202,14 +194,17 @@ foreign import ccall "sixense.h sixenseInit"
   c_sixsenseInit :: IO CInt
 
 -- | Initialize the Sixense library.
+-- WARNING: This library sucks and will crash if you don't check to make sure the controllers
+-- exist before using some of the API. Thus I don't recommend calling this function at all, 
+-- and instead using the version in System.Hardware.Hydra.
+-- The original version used 'threadDelay 2000000'
+-- to avoid segmentation faults even when they Hydra was connected.
+
 -- This function initializes the Sixense library. It must be called at least one time per application. Subsequent calls will have no effect. Once initialized, the other Sixense function calls will work as described until sixenseExit() is called.
 sixenseInit :: IO SixenseSuccess
 sixenseInit = do
   r <- mFromCInt c_sixsenseInit
-  -- delay for 2 seconds.
-  -- It takes some unknown amount of time before things are actually ready
-  -- otherwise, we get a segmentation fault at random
-  threadDelay 2000000
+  
   return r
 
 foreign import ccall "sixense.h sixenseExit"
@@ -382,6 +377,7 @@ getFilterParams = allocaArray 4 $ \valPtrs -> do
   case success of
     Success -> peekArray 4 valPtrs >>= \vals -> case map realToFrac vals of
       [nR,nV,fR,fV] -> return $ Just (nR,nV,fR,fV)
+      _ -> return Nothing
     Failure -> return Nothing
 
 
