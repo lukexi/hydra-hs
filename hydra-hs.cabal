@@ -30,9 +30,22 @@ library
   if os(windows)
     extra-lib-dirs: c:\msys64\usr\local\bin
 
-Test-Suite hydra-test
+test-suite hydra-test
   type:       exitcode-stdio-1.0
   main-is:    Main.hs
   hs-source-dirs:      test
   build-depends:       base >=4.6
                      , hydra-hs
+  ghc-options:         -Wall -threaded
+
+test-suite hydra-gl
+  type:       exitcode-stdio-1.0
+  main-is:    HydraGL.hs
+  hs-source-dirs:      test
+  build-depends:       base >=4.6
+                     , hydra-hs
+                     , gl-pal
+                     , gl
+                     , glfw-pal
+                     , linear
+  ghc-options:         -Wall -threaded
