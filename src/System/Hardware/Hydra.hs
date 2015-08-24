@@ -35,7 +35,7 @@ initSixense = liftIO $ do
   _ <- Raw.sixenseInit
 #else
   liftIO . putStrLn 
-    $  "Hydra disabled as it crashes when not connected \n"
+    $  "Hydra disabled on Mac as it crashes when not connected \n"
     ++ "(unless using a hacky threadDelay before initialization) \n"
     ++ "and I can't think of a way to work around it... :P"
 #endif
