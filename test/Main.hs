@@ -18,8 +18,8 @@ main = do
   mapM_ (\i -> baseConnected i >>= \e -> putStrLn ("Base " ++ (show i) ++ " connected: " ++ (show e))) [0..1]
 
   replicateM_ 1000 $ do
-      -- newest <- getHands base
-      newest <- getHands
+      newest <- getHands base
+      
       print newest
       threadDelay (1000000 `div` 60)
       -- forM_ newest $ \hand -> when (ButtonStart `elem` handButtons hand) $ recalibrate base

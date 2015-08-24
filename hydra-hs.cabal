@@ -41,6 +41,7 @@ test-suite hydra-test
 test-suite hydra-gl
   type:       exitcode-stdio-1.0
   main-is:    HydraGL.hs
+  other-modules: Cube
   hs-source-dirs:      test
   build-depends:       base >=4.6
                      , hydra-hs
@@ -48,4 +49,5 @@ test-suite hydra-gl
                      , gl
                      , glfw-pal
                      , linear
+                     , mtl
   ghc-options:         -Wall -threaded

@@ -13,11 +13,11 @@ resX, resY :: Int
 main :: IO ()
 main = withWindow "GLFW Pal" resX resY $ \(win, eventsChan) -> do
   base <- initSixense
-
+  
   cubeProg <- createShaderProgram "test/cube.vert" "test/cube.frag"
   cube     <- makeCube cubeProg
   useProgram cubeProg
-
+  
   glClearColor 1 1 0 1
   glEnable GL_DEPTH_TEST
 

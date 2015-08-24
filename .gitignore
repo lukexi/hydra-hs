@@ -1,8 +1,7 @@
 dist
-cabal-dev
 *.o
 *.hi
 *.chi
 *.chs.h
-.virthualenv
 cabal.sandbox.config
+.stack-work

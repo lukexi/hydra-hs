@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module System.Hardware.Hydra 
   ( initSixense
   , getHands
@@ -29,7 +30,16 @@ data SixenseBase = SixenseBase
 
 initSixense :: MonadIO m => m SixenseBase
 initSixense = liftIO $ do
+  
+#if !defined(darwin_HOST_OS)
   _ <- Raw.sixenseInit
+#else
+  liftIO . putStrLn 
+    $  "Hydra disabled as it crashes when not connected \n"
+    ++ "(unless using a hacky threadDelay before initialization) \n"
+    ++ "and I can't think of a way to work around it... :P"
+#endif
+  
 
   base <- SixenseBase 
     <$> newIORef False
@@ -44,6 +54,9 @@ initSixense = liftIO $ do
 -- as setActiveBase will crash otherwise :()
 checkConnected :: SixenseBase -> IO Bool
 checkConnected base = do
+  #if defined(darwin_HOST_OS)
+  return False
+  #else
   nowConnected <- Raw.baseConnected 0
   wasConnected <- readIORef (sixbConnected base)
   when (nowConnected && not wasConnected) $ do
@@ -51,6 +64,7 @@ checkConnected base = do
     recalibrate
   writeIORef (sixbConnected base) nowConnected
   return nowConnected
+  #endif
 
 
 getHands :: MonadIO m => SixenseBase -> m [ControllerData]
