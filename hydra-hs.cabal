@@ -26,7 +26,8 @@ library
   include-dirs:        include
   extra-libraries:     sixense_x64
   includes:            sixense.h
-  ghc-options:         -Wall
+  ghc-prof-options:    -Wall -O2 -fprof-auto
+  ghc-options:         -Wall -O2
   if os(windows)
     extra-lib-dirs: c:\msys64\usr\local\bin
 
