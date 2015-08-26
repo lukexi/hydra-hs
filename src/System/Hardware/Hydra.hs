@@ -54,9 +54,9 @@ initSixense = liftIO $ do
 -- as setActiveBase will crash otherwise :()
 checkConnected :: SixenseBase -> IO Bool
 checkConnected base = do
-  #if defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS)
   return False
-  #else
+#else
   nowConnected <- Raw.baseConnected 0
   wasConnected <- readIORef (sixbConnected base)
   when (nowConnected && not wasConnected) $ do
@@ -64,7 +64,7 @@ checkConnected base = do
     recalibrate
   writeIORef (sixbConnected base) nowConnected
   return nowConnected
-  #endif
+#endif
 
 
 getHands :: MonadIO m => SixenseBase -> m [ControllerData]
